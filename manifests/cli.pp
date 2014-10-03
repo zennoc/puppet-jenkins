@@ -8,8 +8,8 @@ class jenkins::cli {
     fail("Use of private class ${name} by ${caller_module_name}")
   }
 
-  $jar = '/usr/lib/jenkins/jenkins-cli.jar'
-  $extract_jar = 'unzip /usr/lib/jenkins/jenkins.war WEB-INF/jenkins-cli.jar'
+  $jar = "${jenkins::libdir}/jenkins-cli.jar"
+  $extract_jar = "jar -xf ${jenkins::libdir}/jenkins.war WEB-INF/jenkins-cli.jar"
   $move_jar = "mv WEB-INF/jenkins-cli.jar ${jar}"
   $remove_dir = 'rm -rf WEB-INF'
 
@@ -20,5 +20,4 @@ class jenkins::cli {
     creates => $jar,
     require => Package['jenkins'],
   }
-
 }
