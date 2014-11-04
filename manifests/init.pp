@@ -12,6 +12,9 @@
 # lts = true
 #   Use LTS verison of jenkins
 #
+# port = 8080 (default)
+#   Sets firewall port to 8080 if puppetlabs-firewall module is installed
+#
 # repo = true (Default)
 #   install the jenkins repo.
 #
@@ -31,11 +34,11 @@
 #
 # Example use
 #
-# class{ 'jenkins::config':
+# class{ 'jenkins':
 #   config_hash => {
 #     'HTTP_PORT' => { 'value' => '9090' }, 'AJP_PORT' => { 'value' => '9009' }
 #   }
-# }
+# V
 #
 # plugin_hash = undef (Default)
 # Hash with config plugins to install
@@ -87,6 +90,13 @@
 # proxy_port = undef (default)
 #   If your environment requires a proxy host to download plugins it can be configured here
 #
+#
+# no_proxy_list = undef (default)
+#   List of hostname patterns to skip using the proxy.
+#   - Accepts input as array only.
+#   - Only effective if "proxy_host" and "proxy_port" are set.
+#
+#
 class jenkins(
   $version            = $jenkins::params::version,
   $lts                = $jenkins::params::lts,
@@ -95,11 +105,14 @@ class jenkins(
   $service_ensure     = $jenkins::params::service_ensure,
   $config_hash        = {},
   $plugin_hash        = {},
+  $job_hash           = {},
   $configure_firewall = undef,
   $install_java       = $jenkins::params::install_java,
   $proxy_host         = undef,
   $proxy_port         = undef,
+  $no_proxy_list      = undef,
   $cli                = undef,
+  $port               = $jenkins::params::port,
   $libdir             = $jenkins::params::libdir,
 ) inherits jenkins::params {
 
@@ -108,6 +121,10 @@ class jenkins(
 
   if $configure_firewall {
     validate_bool($configure_firewall)
+  }
+
+  if $no_proxy_list {
+    validate_array($no_proxy_list)
   }
 
   anchor {'jenkins::begin':}
@@ -126,6 +143,7 @@ class jenkins(
   include jenkins::package
   include jenkins::config
   include jenkins::plugins
+  include jenkins::jobs
 
   if $proxy_host and $proxy_port {
     class { 'jenkins::proxy':
@@ -143,6 +161,7 @@ class jenkins(
       include jenkins::firewall
     }
   }
+
   if $cli {
     include jenkins::cli
   }
@@ -150,9 +169,18 @@ class jenkins(
   Anchor['jenkins::begin'] ->
     Class['jenkins::package'] ->
       Class['jenkins::config'] ->
-        Class['jenkins::plugins']~>
+        Class['jenkins::plugins'] ~>
           Class['jenkins::service'] ->
+            Class['jenkins::jobs'] ->
               Anchor['jenkins::end']
+
+  if $cli {
+    Anchor['jenkins::begin'] ->
+      Class['jenkins::service'] ->
+        Class['jenkins::cli'] ->
+          Class['jenkins::jobs'] ->
+            Anchor['jenkins::end']
+  }
 
   if $install_java {
     Anchor['jenkins::begin'] ->
